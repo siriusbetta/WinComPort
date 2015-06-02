@@ -31,7 +31,7 @@ int APIENTRY _tWinMain(HINSTANCE hThisInstance,
 	wc.lpszMenuName		= NULL;
 	wc.cbClsExtra		= 0;
 	wc.cbWndExtra		= 0;
-	wc.hbrBackground	= (HBRUSH) (COLOR_DESKTOP + 1);
+	wc.hbrBackground	= (HBRUSH) (COLOR_WINDOW + 1);
 
 	if(!RegisterClass(&wc)) return 0;
 
@@ -58,7 +58,22 @@ int APIENTRY _tWinMain(HINSTANCE hThisInstance,
 	return 0;
 }
 
-LRESULT CALLBACK WndProc(HWND hWnd, UINT nUint, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	static HWND hSendEdit, 
+	static HWND hSendEdit, hSendButton, hGetEdit, hGetButton, hLabelSend, hLabelGet;
+	switch(message)
+	{
+	case WM_CREATE:
+		CreateWindow("static", "¬ведите строку и нажмите Send", WS_CHILD|WS_VISIBLE|SS_CENTER,
+						30,10,300,20,
+						hWnd,
+						(HMENU) 0,
+						hThisInstance,
+						NULL);
+						return 0;
+	case WM_DESTROY: PostQuitMessage(0);
+		break;
+	default: return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+	return 0;
 }
