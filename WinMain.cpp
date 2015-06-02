@@ -1,17 +1,23 @@
 #include <Windows.h>
 #include <tchar.h>
 
-#define ID_SENT_EDIT	1000
-#define ID_GET_EDIT		1001
-#define ID_SENT_BUTTON	1002
-#define ID_GET_BUTTON	1004
-#define ID_LIST_PORT	1005
+#define ID_SENT_EDIT			1000
+#define ID_GET_EDIT				1001
+#define ID_SENT_BUTTON			1002
+#define ID_GET_BUTTON			1004
+#define ID_LIST_PORT			1005
+#define ID_PORT_OPEN_BUTTON		1006
 
 HINSTANCE hThisInstance;
 TCHAR WinName[] = _T("WinPort");
 TCHAR WinHead[] = _T("WinComPort terminal");
 
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+
+HANDLE hSerial; //Serial port
+DCB dcb;//Serial port preferences
+int SizeBuffer = 1200;
+COMMTIMEOUTS CommTimeOuts;
 
 int APIENTRY _tWinMain(HINSTANCE hThisInstance,
 					   HINSTANCE hPrevInstance,
@@ -61,6 +67,9 @@ int APIENTRY _tWinMain(HINSTANCE hThisInstance,
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	static HWND hSendEdit, hSendButton, hGetEdit, hGetButton, hLabelSend, hLabelGet, hPortList;
+	static HWND hPortOpenButton;
+	TCHAR hBuff[80];
+
 	switch(message)
 	{
 	case WM_CREATE:
@@ -112,13 +121,23 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						hThisInstance,
 						NULL
 						);
-		hPortList = CreateWindow("listbox", NULL, 
-			WS_CHILD|WS_VISIBLE|LBS_STANDARD|LBS_WANTKEYBOARDINPUT,
-			50, 200, 50, 20,
-			hWnd, (HMENU) ID_LIST_PORT,
-			hThisInstance,
-			NULL);
 
+		hPortList = CreateWindow("listbox", NULL, 
+						WS_CHILD|WS_VISIBLE|LBS_STANDARD|LBS_WANTKEYBOARDINPUT,
+						50, 200, 50, 20,
+						hWnd, (HMENU) ID_LIST_PORT,
+						hThisInstance,
+						NULL);
+
+		hPortOpenButton = CreateWindow("button",
+						_T("Connect"),
+						WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
+						120, 200, 70, 20,
+						hWnd,
+						(HMENU) ID_PORT_OPEN_BUTTON,
+						hThisInstance,
+						NULL
+						);
 		return 0;
 		 }
 
@@ -127,17 +146,76 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			switch(LOWORD(wParam))
 			{
 			case ID_SENT_BUTTON:
-				MessageBox(hWnd, _T("Send"), _T("Send sucesfull"), MB_OK);
-				return 0;
+				{
+					GetWindowText(hSendEdit, hBuff, 80);
+					MessageBox(hWnd, hBuff, _T("Send sucesfull"), MB_OK);
+					return 0;
+				}
 			case ID_GET_BUTTON:
 				MessageBox(hWnd, _T("Get"), _T("Get sucesfull"), MB_OK);
 				return 0;
+			case ID_PORT_OPEN_BUTTON:
+				{
+					hSerial=CreateFile("COM6",GENERIC_READ|GENERIC_WRITE,0,NULL,OPEN_EXISTING,0,NULL);
+
+					SetupComm(hSerial, SizeBuffer, SizeBuffer);
+					GetCommState(hSerial, &dcb);
+					dcb.BaudRate = CBR_9600; 
+					dcb.fBinary = TRUE; 
+					dcb.fOutxCtsFlow = FALSE; 
+					dcb.fOutxDsrFlow = FALSE; 
+					dcb.fDtrControl = DTR_CONTROL_HANDSHAKE; 
+					dcb.fDsrSensitivity = FALSE; 
+					dcb.fNull = FALSE; 
+					dcb.fRtsControl = RTS_CONTROL_DISABLE; 
+					dcb.fAbortOnError = FALSE; 
+					dcb.ByteSize = 8; 
+					dcb.Parity = NOPARITY; 
+					dcb.StopBits = 1; 
+					SetCommState(hSerial, &dcb);
+					CommTimeOuts.ReadIntervalTimeout= 10; 
+					CommTimeOuts.ReadTotalTimeoutMultiplier = 1; 
+					// значений этих тайм – аутов вполне хватает для уверенного приема 
+					// даже на скорости 110 бод 
+					CommTimeOuts.ReadTotalTimeoutConstant = 100; 
+					// используется в данном случае как время ожидания посылки 
+					CommTimeOuts.WriteTotalTimeoutMultiplier = 0; 
+					CommTimeOuts.WriteTotalTimeoutConstant = 0; 
+					SetCommTimeouts(hSerial, &CommTimeOuts);
+					PurgeComm(hSerial, PURGE_RXCLEAR); 
+					PurgeComm(hSerial, PURGE_TXCLEAR);
+
+					if(hSerial==INVALID_HANDLE_VALUE)
+					{
+						MessageBox(NULL,"Не возможно открыть последовательный порт","Error",MB_OK);
+						ExitProcess(1);
+					}
+					CHAR data[] = _T("asdf");
+					DWORD dwSize = sizeof(data);
+					DWORD dwBytesWritten;
+
+					WriteFile (hSerial,data,dwSize,&dwBytesWritten,NULL);
+					DWORD iSize;
+					CHAR sReceivedChar;
+					
+						  ReadFile(hSerial, &sReceivedChar, 1, &iSize, 0);  // получаем 1 байт
+            
+					MessageBox(NULL,(char)sReceivedChar,"Succesfull",MB_OK);
+					return 0;
+				}
+
 			}
+	
+
 
 			return 0;
 		}
-	case WM_DESTROY: PostQuitMessage(0);
-		break;
+	case WM_DESTROY: 
+		{
+			CloseHandle(hSerial);
+			PostQuitMessage(0);
+			break;
+		}
 	default: return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	return 0;
