@@ -196,11 +196,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 					WriteFile (hSerial,data,dwSize,&dwBytesWritten,NULL);
 					DWORD iSize;
-					CHAR sReceivedChar;
+					TCHAR sReceivedChar[80];
 					
-						  ReadFile(hSerial, &sReceivedChar, 1, &iSize, 0);  // получаем 1 байт
+					ReadFile(hSerial, &sReceivedChar,80, &iSize, 0);  // получаем 1 байт
             
-					MessageBox(NULL,(char)sReceivedChar,"Succesfull",MB_OK);
+					MessageBox(NULL,sReceivedChar,"Succesfull",MB_OK);
 					return 0;
 				}
 
