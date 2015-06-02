@@ -40,7 +40,7 @@ int APIENTRY _tWinMain(HINSTANCE hThisInstance,
 						WS_OVERLAPPEDWINDOW,
 						100,
 						50,
-						450,
+						500,
 						350,
 						HWND_DESKTOP,
 						NULL,
@@ -64,13 +64,37 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	switch(message)
 	{
 	case WM_CREATE:
+		{
 		CreateWindow("static", "Введите строку и нажмите Send", WS_CHILD|WS_VISIBLE|SS_CENTER,
-						30,10,300,20,
+						50,30,300,20,
 						hWnd,
 						(HMENU) 0,
 						hThisInstance,
 						NULL);
-						return 0;
+
+		hSendEdit = CreateWindow("edit", NULL,
+						WS_CHILD|WS_VISIBLE|WS_BORDER|ES_LEFT,
+						50, 60, 230, 20,
+						hWnd,
+						(HMENU) ID_SENT_EDIT,
+						hThisInstance,
+						NULL);
+		CreateWindow("static", "Нажмите Get", WS_CHILD|WS_VISIBLE|SS_CENTER,
+						50,120,300,20,
+						hWnd,
+						(HMENU) 0,
+						hThisInstance,
+						NULL);
+
+		hGetEdit = CreateWindow("edit", NULL,
+						WS_CHILD|WS_VISIBLE|WS_BORDER|ES_LEFT,
+						50, 150, 230, 20,
+						hWnd,
+						(HMENU) ID_GET_EDIT,
+						hThisInstance,
+						NULL);
+		return 0;
+		 }
 	case WM_DESTROY: PostQuitMessage(0);
 		break;
 	default: return DefWindowProc(hWnd, message, wParam, lParam);
