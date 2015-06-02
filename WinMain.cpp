@@ -5,7 +5,7 @@
 #define ID_GET_EDIT		1001
 #define ID_SENT_BUTTON	1002
 #define ID_GET_BUTTON	1004
-
+#define ID_LIST_PORT	1005
 
 HINSTANCE hThisInstance;
 TCHAR WinName[] = _T("WinPort");
@@ -60,7 +60,7 @@ int APIENTRY _tWinMain(HINSTANCE hThisInstance,
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	static HWND hSendEdit, hSendButton, hGetEdit, hGetButton, hLabelSend, hLabelGet;
+	static HWND hSendEdit, hSendButton, hGetEdit, hGetButton, hLabelSend, hLabelGet, hPortList;
 	switch(message)
 	{
 	case WM_CREATE:
@@ -79,6 +79,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						(HMENU) ID_SENT_EDIT,
 						hThisInstance,
 						NULL);
+
+		hSendButton = CreateWindow("button", "SEND",
+						WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
+						300, 60, 50, 20,
+						hWnd,
+						(HMENU) ID_SENT_BUTTON,
+						hThisInstance,
+						NULL
+						);
+
 		CreateWindow("static", "ֽאזלטעו Get", WS_CHILD|WS_VISIBLE|SS_CENTER,
 						50,120,300,20,
 						hWnd,
@@ -93,8 +103,39 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						(HMENU) ID_GET_EDIT,
 						hThisInstance,
 						NULL);
+
+		hGetButton = CreateWindow("button", "GET",
+						WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
+						300, 150, 50, 20,
+						hWnd,
+						(HMENU) ID_GET_BUTTON,
+						hThisInstance,
+						NULL
+						);
+		hPortList = CreateWindow("listbox", NULL, 
+			WS_CHILD|WS_VISIBLE|LBS_STANDARD|LBS_WANTKEYBOARDINPUT,
+			50, 200, 50, 20,
+			hWnd, (HMENU) ID_LIST_PORT,
+			hThisInstance,
+			NULL);
+
 		return 0;
 		 }
+
+	case WM_COMMAND:
+		{
+			switch(LOWORD(wParam))
+			{
+			case ID_SENT_BUTTON:
+				MessageBox(hWnd, _T("Send"), _T("Send sucesfull"), MB_OK);
+				return 0;
+			case ID_GET_BUTTON:
+				MessageBox(hWnd, _T("Get"), _T("Get sucesfull"), MB_OK);
+				return 0;
+			}
+
+			return 0;
+		}
 	case WM_DESTROY: PostQuitMessage(0);
 		break;
 	default: return DefWindowProc(hWnd, message, wParam, lParam);
