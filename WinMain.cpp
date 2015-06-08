@@ -1,5 +1,7 @@
-#include <Windows.h>
+#include <windows.h>
 #include <tchar.h>
+#include <string>
+#include <Strsafe.h>
 
 #define ID_SENT_EDIT			1000
 #define ID_GET_EDIT				1001
@@ -11,6 +13,7 @@
 HINSTANCE hThisInstance;
 TCHAR WinName[] = _T("WinPort");
 TCHAR WinHead[] = _T("WinComPort terminal");
+//std::string abs = "";
 
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 
@@ -69,6 +72,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	static HWND hSendEdit, hSendButton, hGetEdit, hGetButton, hLabelSend, hLabelGet, hPortList;
 	static HWND hPortOpenButton;
 	TCHAR hBuff[80];
+	TCHAR str[] = _T("");
+	int cnt = 0;
 
 	switch(message)
 	{
@@ -147,8 +152,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 			case ID_SENT_BUTTON:
 				{
-					GetWindowText(hSendEdit, hBuff, 80);
-					MessageBox(hWnd, hBuff, _T("Send sucesfull"), MB_OK);
+					char cwData[80];
+					DWORD dwBytesWritten;
+					GetWindowText(hSendEdit, cwData, 10);
+
+					MessageBox(NULL, cwData, "Message", MB_OK);
+					DWORD dwSize = sizeof(cwData);
+					int cnt = 0;
+					do
+					{
+						std::string nBuffer = "";
+						nBuffer += cwData[cnt];
+						if((char)cwData[cnt] == 0) break;
+						WriteFile (hSerial,nBuffer.c_str(),1,&dwBytesWritten,NULL);
+						cnt++;
+						nBuffer.clear();
+					}while(true);
 					return 0;
 				}
 			case ID_GET_BUTTON:
@@ -156,7 +175,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				return 0;
 			case ID_PORT_OPEN_BUTTON:
 				{
-					hSerial=CreateFile("COM6",GENERIC_READ|GENERIC_WRITE,0,NULL,OPEN_EXISTING,0,NULL);
+					hSerial=CreateFile("COM1",GENERIC_READ|GENERIC_WRITE,0,NULL,OPEN_EXISTING,0,NULL);
 
 					SetupComm(hSerial, SizeBuffer, SizeBuffer);
 					GetCommState(hSerial, &dcb);
@@ -190,17 +209,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						MessageBox(NULL,"Не возможно открыть последовательный порт","Error",MB_OK);
 						ExitProcess(1);
 					}
-					CHAR data[] = _T("asdf");
-					DWORD dwSize = sizeof(data);
-					DWORD dwBytesWritten;
-
-					WriteFile (hSerial,data,dwSize,&dwBytesWritten,NULL);
+					/*
 					DWORD iSize;
-					TCHAR sReceivedChar[80];
+					char sReceivedChar[1];
+					BOOL flag = true;
+					std::string test = "";
+
 					
-					ReadFile(hSerial, &sReceivedChar,80, &iSize, 0);  // получаем 1 байт
+					{
+						ReadFile(hSerial, sReceivedChar,sizeof(sReceivedChar), &iSize, NULL);//sizeof(sReceivedChar)/8
+							if(iSize == 0) flag = false;
+							test = test + sReceivedChar[0];
+							//cnt++;
+							//abs += sReceivedChar;
+							//MessageBox(NULL,sReceivedChar,"Succesfull",MB_OK);
+					}while(sReceivedChar[0] != 0);
+					MessageBox(NULL,test.c_str(),"Succesfull",MB_OK);
+					//MessageBox(NULL,str,"Succesfull",MB_OK);
+					// получаем 1 байт
             
-					MessageBox(NULL,sReceivedChar,"Succesfull",MB_OK);
+					*/
 					return 0;
 				}
 
