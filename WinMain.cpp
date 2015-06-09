@@ -244,6 +244,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				{
 					//MessageBox(NULL, _T("hh"), _T("sdf"), MB_OK);
 					strName = pi->pName;
+					strName = strName.substr(strName.size() - 1);
 					if(strName.find("COM") != -1)
 						SendMessage(hPortList, LB_ADDSTRING, 0, (LPARAM)strName.c_str());
 					pi++;
