@@ -87,6 +87,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	static HWND hSendEdit, hSendButton, hGetEdit, hGetButton, hLabelSend, hLabelGet, hPortList;
 	static HWND hADC_Button, hLED1_Button, hLED2_Button, hLED3_Button;
 	static HWND hPortOpenButton;
+	int uItem;
+	char Buf[80];
 
 	TCHAR hBuff[80];
 	TCHAR str[] = _T("");
@@ -343,6 +345,33 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					}
 					
 					return 0;
+				}
+			case ID_LIST_PORT:
+				{
+					switch(HIWORD(wParam))
+					{
+					case LBN_ERRSPACE:
+						{
+							wsprintf(szMessage, TEXT("Мало памяти"));
+							Error(hPortList,szMessage);
+							return 0;
+						}
+					case LBN_DBLCLK:
+						{
+							uItem = (int)SendMessage(hPortList,
+								LB_GETCURSEL, 0, 0L);
+							if(uItem != LB_ERR)
+							{
+								SendMessage(
+								hPortList,
+									LB_GETTEXT,
+									uItem,
+									(LPARAM) Buf);
+								MessageBox(hWnd, Buf, _T("Mes"), MB_OK);
+							}
+						}
+
+					}
 				}
 
 			}
