@@ -14,11 +14,35 @@
 #define ID_LED2_CHECKBOX		1008
 #define ID_LED3_CHECKBOX		1009
 #define ID_ADC_ON_OFF			1010
+#define ID_BAUDRATE_600			1011
+#define ID_BAUDRATE_1200		1012
 
+#define ID_BAUDRATE_4800		1013
+#define ID_BAUDRATE_9600		1014
+#define ID_BAUDRATE_14400		1015
+#define ID_BAUDRATE_2400		1019
+
+//Размер буфера
+#define BUFSIZE					255
+
+//Глобальные переменные
+bool ADC_WorkFlag = false;
 TCHAR ADC_MessageOff[] = _T("АЦП ВЫКЛ");
 TCHAR ADC_MessageOn[]  = _T("АЦП ВКЛ");
 TCHAR szMessage[] = _T("");
-bool ADC_WorkFlag = false;
+static HWND hPortList;
+unsigned char bufrd[BUFSIZE], bufwr[BUFSIZE];
+int counter;
+char portName[80];
+
+OVERLAPPED overlapped;
+OVERLAPPED overlappedWr;
+
+bool bConnectionFlag = false;
+TCHAR chConnectionMessage[]		= _T("Connect");
+TCHAR chDisconnectionMessage[]	= _T("Disconnect");
+
+int nBaudRate = 2400;
 
 HINSTANCE hThisInstance;
 TCHAR WinName[] = _T("WinPort");
@@ -31,6 +55,11 @@ HANDLE hSerial; //Serial port
 DCB dcb;//Serial port preferences
 int SizeBuffer = 1200;
 COMMTIMEOUTS CommTimeOuts;
+
+int OpenPort();
+int ClosePort();
+DWORD WINAPI ReadThread(LPVOID);
+int ReadPrinting();
 
 VOID Error(CONST HANDLE hStdOut, CONST LPCSTR szMessage) {
   DWORD dwTemp;
@@ -84,11 +113,13 @@ int APIENTRY _tWinMain(HINSTANCE hThisInstance,
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	static HWND hSendEdit, hSendButton, hGetEdit, hGetButton, hLabelSend, hLabelGet, hPortList;
+	static HWND hSendEdit, hSendButton, hGetEdit, hGetButton, hLabelSend, hLabelGet;
 	static HWND hADC_Button, hLED1_Button, hLED2_Button, hLED3_Button;
 	static HWND hPortOpenButton;
-	int uItem;
-	char Buf[80];
+	static HWND hADCResultText;
+	static HWND hBaudRate_600, hBaudRate_1200, hBaudRate_2400, hBaudRate_4800, hBaudRate_9600, hBaudRate_14400;
+
+	
 
 	TCHAR hBuff[80];
 	TCHAR str[] = _T("");
@@ -98,8 +129,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 	case WM_CREATE:
 		{
+			
 			CreateWindow("static", "АЦП (В)", WS_CHILD|WS_VISIBLE|SS_CENTER,
 						50,30,300,20,
+						hWnd,
+						(HMENU) 0,
+						hThisInstance,
+						NULL);
+
+			hADCResultText = CreateWindow("static", "-", WS_CHILD|WS_VISIBLE|SS_CENTER,
+						50,60,300,20,
 						hWnd,
 						(HMENU) 0,
 						hThisInstance,
@@ -219,14 +258,108 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						NULL);
 
 		hPortOpenButton = CreateWindow("button",
-						_T("Connect"),
+						chConnectionMessage,
 						WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
-						150, 400, 70, 20,
+						300, 400, 100, 20,
 						hWnd,
 						(HMENU) ID_PORT_OPEN_BUTTON,
 						hThisInstance,
 						NULL
 						);
+		CreateWindow("button", "BaudRate", 
+						WS_CHILD|WS_VISIBLE|BS_GROUPBOX,
+						150, 380, 100, 60, hWnd,
+						(HMENU)0, hThisInstance, NULL
+						);
+					
+			
+		hBaudRate_600 = CreateWindow("button", "600",
+						WS_CHILD|WS_VISIBLE|BS_AUTORADIOBUTTON,
+						150, 400, 50, 20,
+						hWnd,
+						(HMENU) ID_BAUDRATE_600,
+						hThisInstance,
+						NULL
+						);
+
+		hBaudRate_1200 = CreateWindow("button", "1200",
+						WS_CHILD|WS_VISIBLE|BS_AUTORADIOBUTTON,
+						150, 420, 50, 20,
+						hWnd,
+						(HMENU) ID_BAUDRATE_1200,
+						hThisInstance,
+						NULL
+						);
+
+		hBaudRate_2400 = CreateWindow("button", "2400",
+						WS_CHILD|WS_VISIBLE|BS_AUTORADIOBUTTON,
+						150, 440, 50, 20,
+						hWnd,
+						(HMENU) ID_BAUDRATE_2400,
+						hThisInstance,
+						NULL
+						);
+
+		hBaudRate_4800 = CreateWindow("button", "4800",
+						WS_CHILD|WS_VISIBLE|BS_AUTORADIOBUTTON,
+						210, 400, 50, 20,
+						hWnd,
+						(HMENU) ID_BAUDRATE_4800,
+						hThisInstance,
+						NULL
+						);
+
+		hBaudRate_9600 = CreateWindow("button", "9600",
+						WS_CHILD|WS_VISIBLE|BS_AUTORADIOBUTTON,
+						210, 420, 50, 20,
+						hWnd,
+						(HMENU) ID_BAUDRATE_9600,
+						hThisInstance,
+						NULL
+						);
+
+		hBaudRate_14400 = CreateWindow("button", "14400",
+						WS_CHILD|WS_VISIBLE|BS_AUTORADIOBUTTON,
+						210, 440, 60, 20,
+						hWnd,
+						(HMENU) ID_BAUDRATE_14400,
+						hThisInstance,
+						NULL
+						);
+
+		switch(nBaudRate)
+			{
+			case 600:
+				{
+					SendMessage(hBaudRate_600, BM_SETCHECK, BST_CHECKED,1);
+					break;
+				}
+			case 1200:
+				{
+					SendMessage(hBaudRate_1200, BM_SETCHECK, BST_CHECKED,1);
+					break;
+				}
+			case 2400:
+				{
+					SendMessage(hBaudRate_2400, BM_SETCHECK, BST_CHECKED,1);
+					break;
+				}
+			case 4800:
+				{
+					SendMessage(hBaudRate_4800, BM_SETCHECK, BST_CHECKED,1);
+					break;
+				}
+			case 9600:
+				{
+					SendMessage(hBaudRate_9600, BM_SETCHECK, BST_CHECKED,1);
+					break;
+				}
+			case 14400:
+				{
+					SendMessage(hBaudRate_14400, BM_SETCHECK, BST_CHECKED,1);
+					break;
+				}
+			}
 
 		DWORD cbNeeded = 0,cReturned = 0;
 		//TCHAR str[] = _T("");
@@ -242,11 +375,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				
 				for(int i = 0; i < cReturned; i++)
 				{
-					//MessageBox(NULL, _T("hh"), _T("sdf"), MB_OK);
 					strName = pi->pName;
-					strName = strName.substr(strName.size() - 1);
 					if(strName.find("COM") != -1)
+					{
+						strName = strName.substr(0, strName.length()-1);
 						SendMessage(hPortList, LB_ADDSTRING, 0, (LPARAM)strName.c_str());
+						
+					}
 					pi++;
 				}
 				
@@ -286,6 +421,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					{
 						SetWindowText((HWND) lParam, ADC_MessageOff);
 						ADC_WorkFlag = true;
+						if(!bConnectionFlag)
+						{
+							MessageBox(NULL, "Порт не открыт! Откройте порт и попробуйте еще раз", "Attention", MB_OK);
+						}
 						return 0;
 					}
 
@@ -296,24 +435,113 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						//MessageBox(NULL,"Из АЦП","Error",MB_OK);
 						return 0;
 					}
-
-					if(ADC_WorkFlag)
+			
+					return 0;
+				}
+			case ID_GET_BUTTON:
+				{
+				
+				return 0;
+				}
+			case ID_PORT_OPEN_BUTTON:
+				{
+					if(portName == NULL)
 					{
+						MessageBox(NULL, "Выберите порт!", "Attention", MB_OK);
+						return 0;
+					}
+					if(!bConnectionFlag)
+					{
+						SetWindowText((HWND) lParam, chDisconnectionMessage);
+						OpenPort();
+						bConnectionFlag = true;
+						
+						return 0;
+					}
 
+					if(bConnectionFlag)
+					{
+						SetWindowText((HWND) lParam, chConnectionMessage);
+						ClosePort();
+						bConnectionFlag = false;
+						return 0;
 					}
 					
 					return 0;
 				}
-			case ID_GET_BUTTON:
-				MessageBox(hWnd, _T("Get"), _T("Get sucesfull"), MB_OK);
-				return 0;
-			case ID_PORT_OPEN_BUTTON:
+			
+			case ID_BAUDRATE_600:
 				{
-					hSerial=CreateFile("COM1",GENERIC_READ|GENERIC_WRITE,0,NULL,OPEN_EXISTING,0,NULL);
+					SendMessage(hBaudRate_600, BM_SETCHECK, BST_CHECKED,1);
+					//MessageBox(NULL, "Hello, world!!!", "asd", MB_OK);
+					nBaudRate = CBR_600;
+					return 0;
+				}
+			case ID_BAUDRATE_1200:
+				{
+					SendMessage(hBaudRate_1200, BM_SETCHECK, BST_CHECKED, 1);
+					nBaudRate = CBR_1200;
+					return 0;
+				}
+			case ID_BAUDRATE_4800:
+				{
+					SendMessage(hBaudRate_4800, BM_SETCHECK, BST_CHECKED, 1);
+					nBaudRate = CBR_4800;
+					return 0;
+				}
+			case ID_BAUDRATE_9600:
+				{
+					SendMessage(hBaudRate_9600, BM_SETCHECK, BST_CHECKED, 1);
+					nBaudRate = CBR_9600;
+					return 0;
+				}
+			case ID_BAUDRATE_14400:
+				{
+					SendMessage(hBaudRate_14400, BM_SETCHECK, BST_CHECKED, 1);
+					nBaudRate = CBR_14400;
+					return 0;
+				}
+			}
+	
 
+
+			return 0;
+		}
+	case WM_DESTROY: 
+		{
+			if(bConnectionFlag)
+				ClosePort();
+
+			PostQuitMessage(0);
+			break;
+		}
+	default: return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+	return 0;
+}
+
+
+int OpenPort()
+{
+	int uItem;
+	
+	uItem = (int)SendMessage(
+							hPortList,
+							LB_GETCURSEL, 0, 0L);
+	if(uItem != LB_ERR)
+	{
+		SendMessage(
+					hPortList,
+					LB_GETTEXT,
+					uItem,
+					(LPARAM) portName);
+	}
+								
+		hSerial=CreateFile(
+					portName,GENERIC_READ|GENERIC_WRITE,0,NULL,OPEN_EXISTING,0,NULL);
 					SetupComm(hSerial, SizeBuffer, SizeBuffer);
 					GetCommState(hSerial, &dcb);
-					dcb.BaudRate = CBR_9600; 
+					dcb.BaudRate = nBaudRate; 
 					dcb.fBinary = TRUE; 
 					dcb.fOutxCtsFlow = FALSE; 
 					dcb.fOutxDsrFlow = FALSE; 
@@ -344,50 +572,49 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						//MessageBox(NULL,"Не возможно открыть последовательный порт","Error",MB_OK);
 						ExitProcess(1);
 					}
-					
-					return 0;
-				}
-			case ID_LIST_PORT:
-				{
-					switch(HIWORD(wParam))
-					{
-					case LBN_ERRSPACE:
-						{
-							wsprintf(szMessage, TEXT("Мало памяти"));
-							Error(hPortList,szMessage);
-							return 0;
-						}
-					case LBN_DBLCLK:
-						{
-							uItem = (int)SendMessage(hPortList,
-								LB_GETCURSEL, 0, 0L);
-							if(uItem != LB_ERR)
-							{
-								SendMessage(
-								hPortList,
-									LB_GETTEXT,
-									uItem,
-									(LPARAM) Buf);
-								MessageBox(hWnd, Buf, _T("Mes"), MB_OK);
-							}
-						}
 
+	return 0;
+}
+
+int ClosePort()
+{
+	CloseHandle(hSerial);
+	return 0;
+}
+
+DWORD WINAPI ReadThread(LPVOID)
+{
+	COMSTAT comstat;
+	DWORD btr, temp, mask, signal;
+
+	overlapped.hEvent = CreateEvent(NULL, true, true, NULL);
+
+	SetCommMask(hSerial, EV_RXCHAR);
+	while(1)
+	{
+		WaitCommEvent(hSerial, &mask, &overlapped);
+		signal = WaitForSingleObject(overlapped.hEvent, INFINITE);
+
+		if(signal == WAIT_OBJECT_0)
+		{
+			if(GetOverlappedResult(hSerial, &overlapped, &temp, true))
+				if((mask & EV_RXCHAR) != 0)
+				{
+					ClearCommError(hSerial, &temp, &comstat);
+					btr = comstat.cbInQue;
+					if(btr)
+					{
+						ReadFile(hSerial, bufrd, btr, &temp, &overlapped);
+						counter += btr;
+						ReadPrinting();
 					}
 				}
-
-			}
-	
-
-
-			return 0;
 		}
-	case WM_DESTROY: 
-		{
-			CloseHandle(hSerial);
-			PostQuitMessage(0);
-			break;
-		}
-	default: return DefWindowProc(hWnd, message, wParam, lParam);
+
 	}
+}
+
+int ReadPrinting()
+{
 	return 0;
 }
