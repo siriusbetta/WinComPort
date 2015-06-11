@@ -31,9 +31,14 @@ TCHAR ADC_MessageOff[] = _T("АЦП ВЫКЛ");
 TCHAR ADC_MessageOn[]  = _T("АЦП ВКЛ");
 TCHAR szMessage[] = _T("");
 static HWND hPortList;
-unsigned char bufrd[BUFSIZE], bufwr[BUFSIZE];
+char bufrd[BUFSIZE], bufwr[BUFSIZE];
 int counter;
 char portName[80];
+bool bComNotChosen = false;
+int uItem = -1;
+HANDLE reader;
+DWORD signal;
+static HWND hADCResultText;
 
 OVERLAPPED overlapped;
 OVERLAPPED overlappedWr;
@@ -59,7 +64,7 @@ COMMTIMEOUTS CommTimeOuts;
 int OpenPort();
 int ClosePort();
 DWORD WINAPI ReadThread(LPVOID);
-int ReadPrinting();
+int ReadPrinting(short a);
 
 VOID Error(CONST HANDLE hStdOut, CONST LPCSTR szMessage) {
   DWORD dwTemp;
@@ -116,7 +121,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	static HWND hSendEdit, hSendButton, hGetEdit, hGetButton, hLabelSend, hLabelGet;
 	static HWND hADC_Button, hLED1_Button, hLED2_Button, hLED3_Button;
 	static HWND hPortOpenButton;
-	static HWND hADCResultText;
+	
 	static HWND hBaudRate_600, hBaudRate_1200, hBaudRate_2400, hBaudRate_4800, hBaudRate_9600, hBaudRate_14400;
 
 	
@@ -138,7 +143,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						NULL);
 
 			hADCResultText = CreateWindow("static", "-", WS_CHILD|WS_VISIBLE|SS_CENTER,
-						50,60,300,20,
+						50,60,200,20,
 						hWnd,
 						(HMENU) 0,
 						hThisInstance,
@@ -421,6 +426,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					{
 						SetWindowText((HWND) lParam, ADC_MessageOff);
 						ADC_WorkFlag = true;
+						reader = CreateThread(NULL, 0, ReadThread, NULL, 0, NULL);
 						if(!bConnectionFlag)
 						{
 							MessageBox(NULL, "Порт не открыт! Откройте порт и попробуйте еще раз", "Attention", MB_OK);
@@ -432,6 +438,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					{
 						SetWindowText((HWND) lParam, ADC_MessageOn);
 						ADC_WorkFlag = false;
+						if(reader)
+						{
+							TerminateThread(reader,0);
+							CloseHandle(overlapped.hEvent);	//нужно закрыть объект-событие
+							CloseHandle(reader);
+							std::auto_ptr<HANDLE> reader(new HANDLE);
+						}
 						//MessageBox(NULL,"Из АЦП","Error",MB_OK);
 						return 0;
 					}
@@ -445,11 +458,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				}
 			case ID_PORT_OPEN_BUTTON:
 				{
-					if(portName == NULL)
+					uItem = (int)SendMessage(
+							hPortList,
+							LB_GETCURSEL, 0, 0L);
+
+					if(uItem <= -1)
 					{
 						MessageBox(NULL, "Выберите порт!", "Attention", MB_OK);
 						return 0;
 					}
+					else
+					{
+
+					}
+
 					if(!bConnectionFlag)
 					{
 						SetWindowText((HWND) lParam, chDisconnectionMessage);
@@ -523,11 +545,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 int OpenPort()
 {
-	int uItem;
 	
-	uItem = (int)SendMessage(
-							hPortList,
-							LB_GETCURSEL, 0, 0L);
 	if(uItem != LB_ERR)
 	{
 		SendMessage(
@@ -578,14 +596,22 @@ int OpenPort()
 
 int ClosePort()
 {
+	
+	if(signal != WAIT_OBJECT_0)
+	{
+		TerminateThread(reader, 0);
+		CloseHandle(overlapped.hEvent);
+		CloseHandle(reader);
+	}
 	CloseHandle(hSerial);
+	bConnectionFlag = false;
 	return 0;
 }
 
 DWORD WINAPI ReadThread(LPVOID)
 {
 	COMSTAT comstat;
-	DWORD btr, temp, mask, signal;
+	DWORD btr, temp, mask;
 
 	overlapped.hEvent = CreateEvent(NULL, true, true, NULL);
 
@@ -594,7 +620,10 @@ DWORD WINAPI ReadThread(LPVOID)
 	{
 		WaitCommEvent(hSerial, &mask, &overlapped);
 		signal = WaitForSingleObject(overlapped.hEvent, INFINITE);
-
+		std::string test = "";
+		short b2;
+		short b3;
+		
 		if(signal == WAIT_OBJECT_0)
 		{
 			if(GetOverlappedResult(hSerial, &overlapped, &temp, true))
@@ -604,9 +633,15 @@ DWORD WINAPI ReadThread(LPVOID)
 					btr = comstat.cbInQue;
 					if(btr)
 					{
-						ReadFile(hSerial, bufrd, btr, &temp, &overlapped);
-						counter += btr;
-						ReadPrinting();
+						ReadFile(hSerial, bufrd, 2, &temp, &overlapped);
+						
+						b2 = bufrd[1];
+						b2 = b2 << 8;
+						b3 = bufrd[0];
+						b3 = b3 & 0xff;
+						b2 = b2 + b3;
+						//MessageBox(NULL, test.c_str(), "asd", MB_OK);
+						ReadPrinting(b2);
 					}
 				}
 		}
@@ -614,7 +649,14 @@ DWORD WINAPI ReadThread(LPVOID)
 	}
 }
 
-int ReadPrinting()
+int ReadPrinting(short test)
 {
+	//std::string buf = (char*)bufrd;
+	//int res = 
+	//std::string = std::int
+	float result = 5 * test / 1023;
+	 char *ot = new char[17]; 
+	itoa(result, ot, 10);//std::lexical_cast<int>(test);
+	 SetWindowText(hADCResultText, ot);
 	return 0;
 }
